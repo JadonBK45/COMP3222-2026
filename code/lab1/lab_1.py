@@ -16,11 +16,16 @@ from pathlib import Path
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.linear_model import LogisticRegression
 from sklearn.experimental import enable_iterative_imputer
+from sklearn.preprocessing import StandardScaler
 from sklearn.impute import IterativeImputer
 from numba import njit
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from sklearn.impute import SimpleImputer
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import train_test_split
 
 # Data lives in <repo root>/data/lab1, this file is in <repo root>/code/lab1.
 DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "lab1"
@@ -163,11 +168,33 @@ def missing_example():
     y = df["y"].to_numpy(dtype=int)
     mean_imp = IterativeImputer(random_state=0)
     X_impute = mean_imp.fit_transform(X)
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X_impute)
     print(f"X shape {X_impute.shape}, {np.isnan(X_impute).sum()} missing values")
+    print(f"X scaled shape {X_scaled.shape}, {np.isnan(X_scaled).sum()} missing values")
     return X_impute, y
+
+def pipeline_example():
+    X, y = missing_example()
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, shuffle=True
+    )
+
+    pipe = Pipeline([
+        ("impute", SimpleImputer(strategy="median")),
+        ("scale", StandardScaler()),
+        ("clf", KNeighborsClassifier()),
+    ])
+
+    pipe.fit(X_train, y_train)
+    y_pred = pipe.predict(X_test)
+    print(f"Test predictions: {y_pred}")
+    print(f"Test accuracy: {pipe.score(X_test, y_test):.3f}")
+    return pipe
 
 
 if __name__ == "__main__":
     # one_hot_example()
-    missing_example()
+    # missing_example()
     # part1_example()
+    pipeline_example()
