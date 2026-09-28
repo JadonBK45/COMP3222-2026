@@ -13,7 +13,10 @@ the single feature classifier) are left for you to write.
 import math
 import time
 from pathlib import Path
-
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.linear_model import LogisticRegression
+from sklearn.experimental import enable_iterative_imputer
+from sklearn.impute import IterativeImputer
 from numba import njit
 import matplotlib.pyplot as plt
 import numpy as np
@@ -127,10 +130,20 @@ def one_hot_example():
     X = df[["x1", "x2", "x3"]].to_numpy(dtype=float)  # shape (n, 3)
     rank = df["rank"].to_numpy(dtype=int)  # shape (n,)
     colour = df["colour"].to_numpy(dtype=str)  # shape (n,)
+    colour_2d = colour.reshape(-1, 1)
+    encoder = OneHotEncoder(sparse_output=False)
+    colour_encoded = encoder.fit_transform(colour_2d)
     y = df["y"].to_numpy(dtype=int)  # shape (n,)
-    print(X.shape, rank.shape, colour.shape, y.shape)
-    print(type(X), type(rank), type(colour), type(y))
-    return X, rank, colour, y
+    X_reformatted = np.column_stack((X,rank, colour_encoded))
+    print(f"Shape:",X_reformatted.shape, "Type:",type(X_reformatted), "Contains NaN:",np.isnan(X_reformatted).any(), "Contains infinity:",np.isinf(X_reformatted).any(), "Labels:",np.unique(y))
+    
+    classifier = LogisticRegression(max_iter=1000)
+    classifier.fit(X_reformatted, y)
+
+    print("Classifier fitted successfully")
+    print("Training accuracy:", classifier.score(X_reformatted, y))
+    
+    return X_reformatted
 
 
 def missing_example():
@@ -148,11 +161,13 @@ def missing_example():
     df = pd.read_csv(path, header=None, names=["x1", "x2", "x3", "y"])
     X = df[["x1", "x2", "x3"]].to_numpy(dtype=float)
     y = df["y"].to_numpy(dtype=int)
-    print(f"X shape {X.shape}, {np.isnan(X).sum()} missing values")
-    return X, y
+    mean_imp = IterativeImputer(random_state=0)
+    X_impute = mean_imp.fit_transform(X)
+    print(f"X shape {X_impute.shape}, {np.isnan(X_impute).sum()} missing values")
+    return X_impute, y
 
 
 if __name__ == "__main__":
     # one_hot_example()
-    # missing_example()
-    part1_example()
+    missing_example()
+    # part1_example()
