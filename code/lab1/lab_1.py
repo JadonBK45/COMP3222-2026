@@ -14,6 +14,7 @@ import math
 import time
 from pathlib import Path
 
+from numba import njit
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -23,9 +24,17 @@ DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "lab1"
 
 
 def euclidean_distance_python(x: np.ndarray, y: np.ndarray) -> float:
-    """Add a docstring."""
-    return 0
+    sum = 0
+    for i in range (len(x)):
+        sum += (x[i]-y[i])**2
+    return sum**0.5
 
+@njit
+def dup_euclidean_distance_python(x: np.ndarray, y: np.ndarray) -> float:
+    sum = 0
+    for i in range (len(x)):
+        sum += (x[i]-y[i])**2
+    return sum**0.5
 
 
 def time_distance(distance_function, n: int, random_state: int = 0) -> float:
@@ -79,14 +88,17 @@ def part1_example(show: bool = True):
     # Time for increasing sizes of input.
     sizes = []
     t_py_list = []
+    t_njit_list= []
     for n in range(100_000, 1_000_001, 100_000):
         sizes.append(n)
         t_py_list.append(time_distance(euclidean_distance_python, n))
-        print(f"n = {n:>9,}  python = {t_py_list[-1]:.6f}s")
+        t_njit_list.append(time_distance(dup_euclidean_distance_python, n))
+        print(f"n = {n:>9,}  njit = {t_njit_list[-1]:.6f}s, python = {t_py_list[-1]:.6f}s")
 
     # --- Plot: time vs n (log-log) ---
     plt.figure(figsize=(7.5, 5.0))
     plt.plot(sizes, t_py_list, marker="o", label="ED Python")
+    plt.plot(sizes, t_njit_list, marker="o", label="ED Numba")
     plt.xscale("log")
     plt.yscale("log")
     plt.xlabel("n (log scale)")
@@ -98,7 +110,7 @@ def part1_example(show: bool = True):
     plt.savefig("jit_speed_time_vs_n.png", dpi=150)
     if show:
         plt.show()
-    return sizes, t_py_list
+    return sizes, t_py_list, t_njit_list
 
 
 def one_hot_example():
@@ -141,6 +153,6 @@ def missing_example():
 
 
 if __name__ == "__main__":
-    one_hot_example()
-    missing_example()
+    # one_hot_example()
+    # missing_example()
     part1_example()
