@@ -26,9 +26,44 @@ from sklearn.impute import SimpleImputer
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import train_test_split
+from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.utils.validation import check_is_fitted
 
 # Data lives in <repo root>/data/lab1, this file is in <repo root>/code/lab1.
 DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "lab1"
+
+
+class OneFeatureClassifier(BaseEstimator, ClassifierMixin):
+    def __init__(self, feature_index=0):
+        self.feature_index = feature_index
+
+    def fit(self, X, y):
+        classes = np.unique(y)
+        if len(classes) != 2:
+            raise ValueError("OneFeatureClassifier requires exactly two classes")
+
+        feature_values = X[:, self.feature_index]
+        class_0_mean = np.mean(feature_values[y == classes[0]])
+        class_1_mean = np.mean(feature_values[y == classes[1]])
+
+        self.classes_ = classes
+        self.threshold_ = np.median(feature_values)
+        if class_0_mean < class_1_mean:
+            self.less_than_class_ = classes[0]
+            self.greater_than_class_ = classes[1]
+        else:
+            self.less_than_class_ = classes[1]
+            self.greater_than_class_ = classes[0]
+        return self
+
+    def predict(self, X):
+        check_is_fitted(self, ["threshold_", "less_than_class_", "greater_than_class_"])
+        feature_values = X[:, self.feature_index]
+        return np.where(
+            feature_values < self.threshold_,
+            self.less_than_class_,
+            self.greater_than_class_,
+        )
 
 
 def euclidean_distance_python(x: np.ndarray, y: np.ndarray) -> float:
@@ -148,7 +183,7 @@ def one_hot_example():
     print("Classifier fitted successfully")
     print("Training accuracy:", classifier.score(X_reformatted, y))
     
-    return X_reformatted
+    return X_reformatted, y
 
 
 def missing_example():
@@ -193,8 +228,24 @@ def pipeline_example():
     return pipe
 
 
+def custom_classifier_example(feature_index=0):
+    X, y = one_hot_example()
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, shuffle=True
+    )
+
+    classifier = OneFeatureClassifier(feature_index=feature_index)
+    classifier.fit(X_train, y_train)
+    y_pred = classifier.predict(X_test)
+    print(f"Selected feature: {feature_index}")
+    print(f"Threshold: {classifier.threshold_:.3f}")
+    print(f"Test predictions: {y_pred}")
+    print(f"Test accuracy: {np.mean(y_pred == y_test):.3f}")
+    return classifier
+
+
 if __name__ == "__main__":
-    # one_hot_example()
+    custom_classifier_example(feature_index=0)
     # missing_example()
     # part1_example()
-    pipeline_example()
+    # pipeline_example()
