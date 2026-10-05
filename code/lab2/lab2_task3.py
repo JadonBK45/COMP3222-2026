@@ -165,6 +165,15 @@ if __name__ == "__main__":    # Example usage
     print("Unique = ", set(y))
     dt = DecisionTreeClassifier()
     dt.fit(X, y)
+    feature_names = [f"Feature {i}" for i in range(X.shape[1])]
+
+    tree.plot_tree(
+        dt,
+        feature_names=feature_names,
+        class_names=["Class 0", "Class 1"],
+    )
+    plt.tight_layout()
+    plt.show()
     iris = load_iris(as_frame=True)
     X_iris = iris.data[["petal length (cm)", "petal width (cm)"]].values
     y_iris = iris.target
