@@ -1,0 +1,10 @@
+Body Temp,Stomach Ache,Spots,Chicken Pox
+HIGH,1,0,0
+LOW,1,0,0
+NORMAL,1,1,1
+NORMAL,1,0,1
+NORMAL,0,1,1
+NORMAL,0,0,0
+LOW,0,0,0
+HIGH,0,0,1
+NORMAL,0,1,1
