@@ -25,6 +25,21 @@ def load_playgolf():
     return X, y
 
 
+def make_model(criterion):
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ("Body Temp", OneHotEncoder(handle_unknown="ignore", sparse_output=False), ["Body Temp"]),
+        ],
+        remainder="passthrough",
+    )
+    return Pipeline(
+        steps=[
+            ("preprocessor", preprocessor),
+            ("classifier", DecisionTreeClassifier(criterion=criterion, random_state=42)),
+        ]
+    )
+
+
 if __name__ == "__main__":
     X, y = load_playgolf()
 
@@ -33,23 +48,13 @@ if __name__ == "__main__":
     # ColumnTransformer and OneHotEncoder can do this in a Pipeline.
     # Check that the transformed X has shape (14, 6).
 
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ("Body Temp", OneHotEncoder(handle_unknown="ignore", sparse_output=False), ["Body Temp"]),
-        ],
-        remainder="passthrough",
-    )
-    model = Pipeline(
-        steps=[
-            ("preprocessor", preprocessor),
-            ("classifier", DecisionTreeClassifier(criterion="gini", random_state=42)),
-        ]
-    )
+    gini_model = make_model("gini")
+    entropy_model = make_model("entropy")
+    gini_model.fit(X, y)
+    entropy_model.fit(X, y)
 
-    model.fit(X, y)
-
-    X_transformed = model.named_steps["preprocessor"].transform(X)
-    feature_names = model.named_steps["preprocessor"].get_feature_names_out()
+    X_transformed = gini_model.named_steps["preprocessor"].transform(X)
+    feature_names = gini_model.named_steps["preprocessor"].get_feature_names_out()
 
     print("Transformed shape:", X_transformed.shape)
     print("Feature names:", feature_names)
@@ -59,12 +64,22 @@ if __name__ == "__main__":
     # If you used a Pipeline, plot its fitted tree step, not the Pipeline itself.
     # How does this tree compare with the one from the lecture?
 
-    fitted_tree = model.named_steps["classifier"]
+    class_names = ["Pox = False", "Pox = True"]
+    fig, axes = plt.subplots(1, 2, figsize=(20, 8))
     tree.plot_tree(
-        fitted_tree,
+        gini_model.named_steps["classifier"],
         feature_names=feature_names,
-        class_names=["Pox = False", "Pox = True"],
+        class_names=class_names,
+        ax=axes[0],
     )
+    axes[0].set_title("Gini")
+    tree.plot_tree(
+        entropy_model.named_steps["classifier"],
+        feature_names=feature_names,
+        class_names=class_names,
+        ax=axes[1],
+    )
+    axes[1].set_title("Entropy")
     plt.tight_layout()
     plt.show()
 
