@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
-
+from collections import defaultdict
 
 def frequency_encode(x: np.ndarray) -> np.ndarray:
     """Replace each category with its frequency in the array.
@@ -32,7 +32,7 @@ def frequency_encode(x: np.ndarray) -> np.ndarray:
     return np.asarray(encoded, dtype=float)
 
 
-def impact_encode(x: np.ndarray, y:np.ndarray) -> np.ndarray:
+def impact_encode(x: np.ndarray, y: np.ndarray) -> list[float]:
     """Perform impact encoding on a 1D numpy array.
 
     Each string value is replaced by the frequency of class 1 in y.
@@ -45,20 +45,37 @@ def impact_encode(x: np.ndarray, y:np.ndarray) -> np.ndarray:
 
     Returns
     -------
-    np.ndarray
-        A 1D numpy array where each category is replaced by the mean of the
-        target variable for that category.
+    list[float]
+        A list containing the frequency of each value within its target class,
+        in the original order of ``x`` and ``y``.
     """
-    x = np.asarray(x)
-    y = np.asarray(y)
-    # Split cases based on Class 1 or Class 0
-    sums_counts = {}
-    for cat, yv in zip(x, y):
-        s, cc = sums_counts.get(cat, (0.0, 0))
-        sums_counts[cat] = (s + yv, cc + 1)
-    print("sums_counts:", sums_counts)
-    return X
 
+    # Split cases based on Class 1 or Class 0
+    x = x.astype(str)
+    value_by_target = {}
+    counts = set()
+
+    for value, target in zip(x,y):
+        value_by_target.setdefault(target, []).append(value)
+
+    for target, values in value_by_target.items():
+        frequencies = frequency_encode(np.asarray(values, dtype=object))
+        counts.update(
+            (value, target, float(frequency))
+            for value, frequency in zip(values, frequencies)
+        )
+
+    frequency_lookup = {
+        (value, target): frequency
+        for value, target, frequency in counts
+    }
+
+    X = [
+        frequency_lookup[(value, target)]
+        for value, target in zip(x, y)
+    ]
+
+    return X
 
 def check_functions():
     # Outlook / Play Golf data from the image (14 rows)
@@ -147,13 +164,7 @@ class FrequencyEncoderTransformer(BaseEstimator, TransformerMixin):
 
 if __name__ == "__main__":
     X, y = load_credit_approval_data("../../data/lab3/credit_approval.csv")
-    # print(X.shape, y.shape)
-    # print("Unique target values:", set(y))
-    # print(X[1])
-    # print(X.shape[1])
-    # print(len(X[:, 0]))
-    print(impact_encode(X[:, 3], y))
+    check_functions()
     # freq = FrequencyEncoderTransformer()
     # X2 = freq.fit_transform(X)
     # print(X2[0])
-
