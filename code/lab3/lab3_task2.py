@@ -1,40 +1,69 @@
-from __future__ import annotations
-import numpy as np
-from sklearn.base import BaseEstimator, ClassifierMixin, clone
-from sklearn.utils.validation import check_is_fitted
+"""Lab 3, Task 2: compare regression models (student starter)."""
+from sklearn.linear_model import LinearRegression
+from sklearn.tree import DecisionTreeRegressor
+from pathlib import Path
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import mean_squared_error
+from sklearn.ensemble import RandomForestRegressor
 
-class BasicEnsembleClassifier(BaseEstimator, ClassifierMixin):
-    """
-    A very simple majority-vote ensemble.
 
-    Parameters
-    ----------
-    base_estimator : estimator
-        Any sklearn-compatible classifier (must implement fit/predict; predict_proba optional).
-    n_estimators : int, default=10
-        Number of cloned members.
-    sample_fraction : float, default=0.6
-        Fraction of training samples used per member (rounded to at least 1).
-    replace : bool, default=False
-        If True, sample with replacement (bootstrap). Default is without replacement.
-    random_state : int or None, default=None
-        Seed for reproducibility.
+import pandas as pd
+from sklearn.model_selection import train_test_split
 
-    Notes
-    -----
-    - Cloning uses sklearn.base.clone.
-    - Sampling uses numpy choice for speed and clarity.
-    """
 
-    def __init__(self, base_estimator, n_estimators=100, sample_fraction=0.6,
-                 replace=False, random_state=None):
-        pass
+DATA_PATH = Path(__file__).resolve().parents[2] / "data" / "lab3" / "winequality-red.csv"
 
-    def fit(self, X, y, sample_weight=None):
-        return self
 
-    def predict_proba(self, X):
-        pass
+def load_wine_quality_data(path=DATA_PATH):
+    """Return wine measurements X and quality scores y as NumPy arrays."""
+    data = pd.read_csv(path, sep=";")
+    X = data.drop(columns="quality").to_numpy()
+    y = data["quality"].to_numpy()
+    return X, y
 
-    def predict(self, X):
-        pass
+
+if __name__ == "__main__":
+    X, y = load_wine_quality_data()
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, train_size=0.7, random_state=42
+    )
+    print(f"Wine quality: {X.shape[0]} rows, {X.shape[1]} features")
+    print(f"Training: {len(y_train)} rows; test: {len(y_test)} rows")
+    print()
+    # TODO: Fit LinearRegression on X_train, y_train.
+    lr = LinearRegression()
+    lr.fit(X_train, y_train)
+    # TODO: Print mean_squared_error for training and test predictions.
+    y_train_pred = lr.predict(X_train)
+    y_test_pred = lr.predict(X_test)
+    TrainMSE = mean_squared_error(y_train, y_train_pred)
+    TestMSE = mean_squared_error(y_test, y_test_pred)
+    print(f"Training MSE: {TrainMSE:.4f}")
+    print(f"Test MSE: {TestMSE:.4f}")
+    print()
+    # TODO: Repeat for DecisionTreeRegressor(max_depth=3, random_state=42).
+    dt = DecisionTreeRegressor(max_depth=3, random_state=42)
+    dt.fit(X_train, y_train)
+    y_train_pred_dt = dt.predict(X_train)
+    y_test_pred_dt = dt.predict(X_test)
+    TrainMSE_dt = mean_squared_error(y_train, y_train_pred_dt)
+    TestMSE_dt = mean_squared_error(y_test, y_test_pred_dt)
+    print(f"Training MSE (Decision Tree): {TrainMSE_dt:.4f}")
+    print(f"Test MSE (Decision Tree): {TestMSE_dt:.4f}")
+    print()
+    # TODO: Try several tree depths, then RandomForestRegressor(random_state=42).
+    dt_depths = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    for depth in dt_depths:
+        dt = DecisionTreeRegressor(max_depth=depth, random_state=42)
+        dt.fit(X_train, y_train)
+        y_test_pred_dt = dt.predict(X_test)
+        TestMSE_dt = mean_squared_error(y_test, y_test_pred_dt)
+        print(f"Test MSE (Decision Tree, depth={depth}): {TestMSE_dt:.4f}")
+    print()
+    # TODO: Fit RandomForestRegressor with 100 trees.
+    rf = RandomForestRegressor(n_estimators=100, random_state=42)
+    rf.fit(X_train, y_train)
+    y_test_pred_rf = rf.predict(X_test)
+    TestMSE_rf = mean_squared_error(y_test, y_test_pred_rf)
+    print(f"Training MSE (Random Forest): {mean_squared_error(y_train, rf.predict(X_train)):.4f}")
+    print(f"Test MSE (Random Forest): {TestMSE_rf:.4f}")

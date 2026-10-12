@@ -2,6 +2,9 @@ import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 from collections import defaultdict
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
 
 def frequency_encode(x: np.ndarray) -> np.ndarray:
     """Replace each category with its frequency in the array.
@@ -151,20 +154,89 @@ from sklearn.base import BaseEstimator, TransformerMixin
 
 
 class FrequencyEncoderTransformer(BaseEstimator, TransformerMixin):
-    """
-    Frequency-encode any non-numeric (string/bytes/mixed) columns.
-    Numeric columns pass through unchanged. No NaN handling.
-    """
+    """Frequency-encode categorical columns and preserve numeric columns."""
+
     def fit(self, X, y=None):
+        X = np.asarray(X, dtype=object)
+
+        if X.ndim != 2:
+            raise ValueError("X must be a 2D array")
+
+        self.numeric_columns_ = []
+        self.frequency_maps_ = []
+
+        for column in range(X.shape[1]):
+            values = X[:, column]
+
+            if all(
+                pd.isna(value) or isinstance(value, (int, float, np.number))
+                for value in values
+            ):
+                self.numeric_columns_.append(True)
+                self.frequency_maps_.append(None)
+            else:
+                self.numeric_columns_.append(False)
+
+                non_missing_values = [
+                    value for value in values if not pd.isna(value)
+                ]
+
+                frequencies = frequency_encode(
+                    np.asarray(non_missing_values, dtype=object)
+                )
+
+                mapping = {
+                    value: float(frequency)
+                    for value, frequency
+                    in zip(non_missing_values, frequencies)
+                }
+
+                self.frequency_maps_.append(mapping)
+
+        self.n_features_in_ = X.shape[1]
         return self
 
     def transform(self, X):
-        return X
+        X = np.asarray(X, dtype=object)
 
+        if X.ndim != 2:
+            raise ValueError("X must be a 2D array")
+
+        if X.shape[1] != self.n_features_in_:
+            raise ValueError("X has a different number of columns than the fitted data")
+
+        transformed = np.empty(X.shape, dtype=float)
+
+        for column in range(X.shape[1]):
+            values = X[:, column]
+
+            if self.numeric_columns_[column]:
+                transformed[:, column] = values.astype(float)
+            else:
+                mapping = self.frequency_maps_[column]
+
+                transformed[:, column] = [
+                    0.0 if pd.isna(value) else mapping.get(value, 0.0)
+                    for value in values
+                ]
+
+        return transformed
 
 if __name__ == "__main__":
     X, y = load_credit_approval_data("../../data/lab3/credit_approval.csv")
-    check_functions()
-    # freq = FrequencyEncoderTransformer()
-    # X2 = freq.fit_transform(X)
-    # print(X2[0])
+    # check_functions()
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y
+    )
+    freq = FrequencyEncoderTransformer()
+    X_train_encoded = freq.fit_transform(X_train)
+    X_test_encoded = freq.transform(X_test)
+    tree = DecisionTreeClassifier(random_state=42)
+    tree.fit(X_train_encoded, y_train)
+    y_pred = tree.predict(X_test_encoded)
+
+    print("Real values: ", y_test)
+    print("Predictions: ", y_pred)
+
+    accuracy = accuracy_score(y_test, y_pred)
+    print(f"Accuracy: {accuracy:.2%}")
