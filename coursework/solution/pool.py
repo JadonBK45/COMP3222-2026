@@ -4,57 +4,47 @@ import numpy as np
 def generate_oof_probas(estimators,X,y,cv=5,random_state=None):
 
     # Input validation
+    names = [name for name, _ in estimators]
+    class_order = np.unique(y)
+    _, class_counts = np.unique(y, return_counts=True)
+    
     if not isinstance(estimators, list):
         raise TypeError("estimators must be a list.")
-
     if len(estimators) == 0:
         raise ValueError("estimators must not be empty.")
-
     if not all(isinstance(item, tuple) and len(item) == 2 for item in estimators):
         raise ValueError("Each estimator must be a (name, estimator) tuple.")
-
-    names = [name for name, _ in estimators]
-
     if not all(isinstance(name, str) and name for name in names):
         raise ValueError("Each estimator name must be a non-empty string.")
-
     if len(names) != len(set(names)):
         raise ValueError("Estimator names must be unique.")
-
     if not isinstance(X, np.ndarray):
         raise TypeError("X must be a NumPy array.")
-
     if X.ndim != 2:
         raise ValueError("X must be a 2D array.")
-
     if not isinstance(y, np.ndarray):
         raise TypeError("y must be a NumPy array.")
-
     if y.ndim != 1:
         raise ValueError("y must be a 1D array.")
-
     if len(X) != len(y):
         raise ValueError("X and y must contain the same number of cases.")
-
     if len(y) == 0:
         raise ValueError("X and y must not be empty.")
-
     if isinstance(cv, (bool, np.bool_)) or not isinstance(cv, (int, np.integer)):
         raise TypeError("cv must be an integer.")
-
     if cv < 2:
         raise ValueError("cv must be at least 2.")
-
-    if isinstance(random_state, (bool, np.bool_)) or not (
-        random_state is None or isinstance(random_state, (int, np.integer))
-    ):
+    if len(class_order) < 2:
+        raise ValueError("y must contain at least two classes.")
+    if cv > len(y):
+        raise ValueError("cv cannot exceed the number of cases.")
+    if np.any(class_counts < cv):
+        raise ValueError("Each class must have at least cv examples.")
+    if isinstance(random_state, (bool, np.bool_)) or not (random_state is None or isinstance(random_state, (int, np.integer))):
         raise TypeError("random_state must be an integer or None.")
-
     for name, estimator in estimators:
         if not callable(getattr(estimator, "predict_proba", None)):
-            raise ValueError(
-                f"Estimator '{name}' must implement predict_proba."
-            )
+            raise ValueError(f"Estimator '{name}' must implement predict_proba.")
 
     #Initialise the probabilities array with zeros
     class_order = np.unique(y)
