@@ -4,16 +4,13 @@ import numpy as np
 def generate_oof_probas(estimators,X,y,cv=5,random_state=None):
 
     # Input validation
-    names = [name for name, _ in estimators]
-    class_order = np.unique(y)
-    _, class_counts = np.unique(y, return_counts=True)
-    
     if not isinstance(estimators, list):
         raise TypeError("estimators must be a list.")
     if len(estimators) == 0:
         raise ValueError("estimators must not be empty.")
     if not all(isinstance(item, tuple) and len(item) == 2 for item in estimators):
         raise ValueError("Each estimator must be a (name, estimator) tuple.")
+    names = [name for name, _ in estimators]
     if not all(isinstance(name, str) and name for name in names):
         raise ValueError("Each estimator name must be a non-empty string.")
     if len(names) != len(set(names)):
@@ -34,10 +31,16 @@ def generate_oof_probas(estimators,X,y,cv=5,random_state=None):
         raise TypeError("cv must be an integer.")
     if cv < 2:
         raise ValueError("cv must be at least 2.")
+    class_order = np.unique(y)
+
     if len(class_order) < 2:
         raise ValueError("y must contain at least two classes.")
+
     if cv > len(y):
         raise ValueError("cv cannot exceed the number of cases.")
+
+    _, class_counts = np.unique(y, return_counts=True)
+
     if np.any(class_counts < cv):
         raise ValueError("Each class must have at least cv examples.")
     if isinstance(random_state, (bool, np.bool_)) or not (random_state is None or isinstance(random_state, (int, np.integer))):
@@ -47,8 +50,7 @@ def generate_oof_probas(estimators,X,y,cv=5,random_state=None):
             raise ValueError(f"Estimator '{name}' must implement predict_proba.")
 
     #Initialise the probabilities array with zeros
-    class_order = np.unique(y)
-    probabilities = np.zeros((len(estimators), X.shape[0], len(np.unique(y))))
+    probabilities = np.zeros((len(estimators), X.shape[0], len(class_order)))
     scores = np.zeros(len(estimators))
     # Create the folds in data using StratifiedKFold to maintain class distribution
     skf = StratifiedKFold(n_splits=cv, shuffle=True, random_state=random_state)
