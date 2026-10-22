@@ -74,15 +74,3 @@ def generate_oof_probas(estimators,X,y,cv=5,random_state=None):
         scores[i] = np.mean(predicted == y)
     
     return probabilities, scores
-
-if __name__ == "__main__":
-    from sklearn.datasets import load_iris
-    from sklearn.ensemble import RandomForestClassifier
-    from sklearn.linear_model import LogisticRegression
-
-    X, y = load_iris(return_X_y=True)
-    estimators = [("Random Forest", RandomForestClassifier()), ("Logistic Regression", LogisticRegression(max_iter=1000))]
-    oof_probas, oof_scores = generate_oof_probas(estimators, X, y, cv=5, random_state=42)
-    print(oof_probas.shape)  # Should be (2, 150, 3) for the iris dataset with 2 classifiers and 3 classes
-    print(oof_scores.shape)  # Should be (2,) for the iris dataset with 2 classifiers
-    print(oof_scores)  # Print the accuracy scores for each estimator
