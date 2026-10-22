@@ -1,7 +1,7 @@
+# from sklearn.ensemble import RandomForestClassifier
+# from sklearn.svm import SVC
+# from sklearn.calibration import CalibratedClassifierCV
 from sklearn.base import ClassifierMixin, BaseEstimator, clone
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.svm import SVC
-from sklearn.calibration import CalibratedClassifierCV
 from coursework.solution.pool import generate_oof_probas
 import numpy as np
 from sklearn.metrics import log_loss
@@ -30,8 +30,7 @@ class GreedyEnsembleSelector(ClassifierMixin, BaseEstimator):
                 "max_ensemble_size must be None or a positive integer."
             )
         # Maintain reference to original estimator pool, in case fit is called multiple times
-        pool_estimators = getattr(self, "_pool_estimators", self.estimators)
-        self._pool_estimators = pool_estimators
+        pool_estimators = self.estimators
 
         classes = np.unique(y)
 
@@ -50,6 +49,7 @@ class GreedyEnsembleSelector(ClassifierMixin, BaseEstimator):
         selection_scores = [current_score]
         remaining_indices = [index for index in range(len(pool_estimators)) if index != first_index]
 
+        # Continue adding estimators while selection is sitll possible
         while remaining_indices and (self.max_ensemble_size is None or len(selected_indices) < self.max_ensemble_size):
             best_candidate_index = None
             if self.metric == "accuracy":
@@ -85,57 +85,90 @@ class GreedyEnsembleSelector(ClassifierMixin, BaseEstimator):
             current_score = best_candidate_score
             selection_scores.append(current_score)
 
-        self.classes = classes
-        self.selected_indices = selected_indices
-        self.selected_names = [pool_estimators[index][0] for index in selected_indices]
-        self.selection_scores = selection_scores
-        self.estimators = []
+        # Store fitted attributes
+        self.classes_ = classes
+        self.selected_indices_ = selected_indices
+        self.selected_names_ = [pool_estimators[index][0] for index in selected_indices]
+        self.selection_scores_ = selection_scores
+        self.estimators_ = []
+
+        # Clone selected estimators and fit them on the entire dataset
         for index in selected_indices:
             estimator = clone(pool_estimators[index][1])
             estimator.fit(X, y)
-            self.estimators.append(estimator)
+            self.estimators_.append(estimator)
+
         return self
 
     def predict_proba(self, X):
-        if not hasattr(self, "selected_indices"):
+        # Check if the model has been fitted
+        if not hasattr(self, "selected_indices_"):
             raise NotFittedError("This GreedyEnsembleSelector instance is not fitted yet.")
 
         probabilities = []
-        for estimator in self.estimators:
+        for estimator in self.estimators_:
             estimator_probas = estimator.predict_proba(X)
-            aligned = np.zeros((len(X), len(self.classes)))
+            aligned = np.zeros((len(X), len(self.classes_)))
             for column, class_label in enumerate(estimator.classes_):
-                class_index = np.where(self.classes == class_label)[0][0]
+                class_index = np.where(self.classes_ == class_label)[0][0]
                 aligned[:, class_index] = estimator_probas[:, column]
             probabilities.append(aligned)
         return np.mean(probabilities, axis=0)
 
     def predict(self, X):
         probabilities = self.predict_proba(X)
-        return self.classes[np.argmax(probabilities, axis=1)]
+        return self.classes_[np.argmax(probabilities, axis=1)]
 
-if __name__ == "__main__":
-    from sklearn.datasets import load_iris
-    from sklearn.linear_model import LogisticRegression
-    from sklearn.tree import DecisionTreeClassifier
+# if __name__ == "__main__":
+#     from sklearn.datasets import load_iris
+#     from sklearn.linear_model import LogisticRegression
+#     from sklearn.metrics import accuracy_score, log_loss
+#     from sklearn.model_selection import train_test_split
+#     from sklearn.tree import DecisionTreeClassifier
 
-    # Load the Iris dataset
-    X, y = load_iris(return_X_y=True)
+#     # Load the Iris dataset
+#     X, y = load_iris(return_X_y=True)
+#     X_train, X_test, y_train, y_test = train_test_split(
+#         X,
+#         y,
+#         test_size=0.2,
+#         random_state=42,
+#         stratify=y,
+#     )
 
-    # Define a pool of classifiers
-    estimators = [
-        ("logistic", LogisticRegression(max_iter=1000)),
-        ("decision_tree", DecisionTreeClassifier()),
-        ("random_forest", RandomForestClassifier(n_estimators=100)),
-        ("svm", CalibratedClassifierCV(SVC(), ensemble=False)),
-        ("svm_linear", CalibratedClassifierCV(SVC(kernel="linear"), ensemble=False)),
+#     # Define a pool of classifiers
+#     estimators = [
+#         ("logistic", LogisticRegression(max_iter=1000, random_state=42)),
+#         ("decision_tree", DecisionTreeClassifier(random_state=42)),
+#         ("random_forest", RandomForestClassifier(n_estimators=100, random_state=42)),
+#         ("svm", CalibratedClassifierCV(SVC(random_state=42), ensemble=False)),
+#         ("svm_linear", CalibratedClassifierCV(SVC(kernel="linear", random_state=42), ensemble=False)),
 
-    ]
+#     ]
 
-    # Create an instance of the GreedyEnsembleSelector
-    ensemble_selector = GreedyEnsembleSelector(
-        estimators=estimators, cv=5, max_ensemble_size=2, metric="log loss", random_state=42
-    )
+#     # Create an instance of the GreedyEnsembleSelector
+#     ensemble_selector = GreedyEnsembleSelector(
+#         estimators=estimators, cv=5, max_ensemble_size=5, metric="log loss", random_state=42
+#     )
 
-    # Fit the ensemble selector to the data
-    ensemble_selector.fit(X, y)
+#     # Fit the ensemble selector to the data
+#     print("Fitting greedy ensemble selector...")
+#     ensemble_selector.fit(X_train, y_train)
+#     print(f"Selected classifiers: {ensemble_selector.selected_names}")
+#     print(f"Selected indices: {ensemble_selector.selected_indices}")
+#     print(f"OOF selection scores: {ensemble_selector.selection_scores}")
+
+#     test_predictions = ensemble_selector.predict(X_test)
+#     test_probabilities = ensemble_selector.predict_proba(X_test)
+#     test_accuracy = accuracy_score(y_test, test_predictions)
+#     test_log_loss = log_loss(
+#         y_test,
+#         test_probabilities,
+#         labels=ensemble_selector.classes,
+#     )
+
+#     print(f"Test accuracy: {test_accuracy:.4f}")
+#     print(f"Test log loss: {test_log_loss:.4f}")
+#     ensemble_predictions = ensemble_selector.predict(X)
+#     ensemble_probas = ensemble_selector.predict_proba(X)
+#     print("Selected estimators:", ensemble_selector.selected_names)
