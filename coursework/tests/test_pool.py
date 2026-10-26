@@ -3,7 +3,7 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.datasets import load_iris
 from sklearn.linear_model import LogisticRegression
 
-from coursework.solution.pool import generate_oof_probas
+from solution.pool import generate_oof_probas
 
 
 class TrainingMembershipClassifier(BaseEstimator, ClassifierMixin):

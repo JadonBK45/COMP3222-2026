@@ -1,8 +1,5 @@
-# from sklearn.ensemble import RandomForestClassifier
-# from sklearn.svm import SVC
-# from sklearn.calibration import CalibratedClassifierCV
 from sklearn.base import ClassifierMixin, BaseEstimator, clone
-from coursework.solution.pool import generate_oof_probas
+from .pool import generate_oof_probas
 import numpy as np
 from sklearn.metrics import log_loss
 from sklearn.exceptions import NotFittedError
@@ -118,57 +115,3 @@ class GreedyEnsembleSelector(ClassifierMixin, BaseEstimator):
     def predict(self, X):
         probabilities = self.predict_proba(X)
         return self.classes_[np.argmax(probabilities, axis=1)]
-
-# if __name__ == "__main__":
-#     from sklearn.datasets import load_iris
-#     from sklearn.linear_model import LogisticRegression
-#     from sklearn.metrics import accuracy_score, log_loss
-#     from sklearn.model_selection import train_test_split
-#     from sklearn.tree import DecisionTreeClassifier
-
-#     # Load the Iris dataset
-#     X, y = load_iris(return_X_y=True)
-#     X_train, X_test, y_train, y_test = train_test_split(
-#         X,
-#         y,
-#         test_size=0.2,
-#         random_state=42,
-#         stratify=y,
-#     )
-
-#     # Define a pool of classifiers
-#     estimators = [
-#         ("logistic", LogisticRegression(max_iter=1000, random_state=42)),
-#         ("decision_tree", DecisionTreeClassifier(random_state=42)),
-#         ("random_forest", RandomForestClassifier(n_estimators=100, random_state=42)),
-#         ("svm", CalibratedClassifierCV(SVC(random_state=42), ensemble=False)),
-#         ("svm_linear", CalibratedClassifierCV(SVC(kernel="linear", random_state=42), ensemble=False)),
-
-#     ]
-
-#     # Create an instance of the GreedyEnsembleSelector
-#     ensemble_selector = GreedyEnsembleSelector(
-#         estimators=estimators, cv=5, max_ensemble_size=5, metric="log loss", random_state=42
-#     )
-
-#     # Fit the ensemble selector to the data
-#     print("Fitting greedy ensemble selector...")
-#     ensemble_selector.fit(X_train, y_train)
-#     print(f"Selected classifiers: {ensemble_selector.selected_names}")
-#     print(f"Selected indices: {ensemble_selector.selected_indices}")
-#     print(f"OOF selection scores: {ensemble_selector.selection_scores}")
-
-#     test_predictions = ensemble_selector.predict(X_test)
-#     test_probabilities = ensemble_selector.predict_proba(X_test)
-#     test_accuracy = accuracy_score(y_test, test_predictions)
-#     test_log_loss = log_loss(
-#         y_test,
-#         test_probabilities,
-#         labels=ensemble_selector.classes,
-#     )
-
-#     print(f"Test accuracy: {test_accuracy:.4f}")
-#     print(f"Test log loss: {test_log_loss:.4f}")
-#     ensemble_predictions = ensemble_selector.predict(X)
-#     ensemble_probas = ensemble_selector.predict_proba(X)
-#     print("Selected estimators:", ensemble_selector.selected_names)
