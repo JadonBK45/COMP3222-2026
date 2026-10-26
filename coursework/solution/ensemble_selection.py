@@ -115,3 +115,33 @@ class GreedyEnsembleSelector(ClassifierMixin, BaseEstimator):
     def predict(self, X):
         probabilities = self.predict_proba(X)
         return self.classes_[np.argmax(probabilities, axis=1)]
+
+# if __name__ == "__main__":
+#     ## Test greedy ensemble on the specified dataset.
+#     from part3_setup import load_dataset
+#     from part3_setup import make_pool
+#     ensemble = GreedyEnsembleSelector(make_pool(), cv=5, metric="log loss", random_state=0)
+#     X_train, y_train, X_test, y_test = load_dataset("DistalPhalanxOutlineAgeGroup")
+#     ensemble.fit(X_train, y_train)
+#     y_pred = ensemble.predict(X_test)
+#     from sklearn.metrics import accuracy_score
+#     print(f"Greedy ensemble log loss on DistalPhalanxOutlineAgeGroup: {accuracy_score(y_test, y_pred)}")
+#     print(f"Selected estimators: {ensemble.selected_names_}")
+#     print(f"Selection scores: {ensemble.selection_scores_}")
+
+#     # Determine the best single classifier on the ToeSegmentation1 dataset.
+#     from part3_setup import load_dataset
+#     from part3_setup import make_pool
+#     from .pool import generate_oof_probas
+#     from sklearn.base import clone
+#     from sklearn.metrics import accuracy_score
+#     X_train, y_train, X_test, y_test = load_dataset("ToeSegmentation1")
+#     RANDOM_STATE = 0
+#     CV = 5
+#     pool = make_pool()
+#     _, scores = generate_oof_probas(pool, X_train, y_train, cv=CV, random_state=RANDOM_STATE)
+#     best_index = int(np.argmax(scores))
+#     fitted = clone(pool[best_index][1]).fit(X_train, y_train).predict(X_test)
+#     print(f"Best single classifier accuracy on ToeSegmentation1: {accuracy_score(y_test, fitted)}")
+#     print(f"Best single classifier: {pool[best_index][0]} with accuracy {scores[best_index]}")
+#     print(f"Second best classifier: {pool[np.argsort(scores)[-2]][0]} with accuracy {scores[np.argsort(scores)[-2]]}")

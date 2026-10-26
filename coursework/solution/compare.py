@@ -37,11 +37,7 @@ def stacking_ensemble(X_train, y_train, X_test, y_test):
 
 def greedy_accuracy_ensemble(X_train, y_train, X_test, y_test, max_ensemble_size=None):
     greedy_accuracy = GreedyEnsembleSelector(make_pool(), cv=CV, max_ensemble_size=max_ensemble_size, metric="accuracy", random_state=RANDOM_STATE).fit(X_train, y_train)
-    return (
-        accuracy_score(y_test, greedy_accuracy.predict(X_test)),
-        len(greedy_accuracy.selected_indices_),
-        greedy_accuracy.selection_scores_[-1],
-    )
+    return (accuracy_score(y_test, greedy_accuracy.predict(X_test)),len(greedy_accuracy.selected_indices_),greedy_accuracy.selection_scores_[-1])
 
 def greedy_log_loss_ensemble(X_train, y_train, X_test, y_test, max_ensemble_size=None):
     greedy_log_loss = GreedyEnsembleSelector(make_pool(),cv=CV,max_ensemble_size=max_ensemble_size,metric="log loss",random_state=RANDOM_STATE).fit(X_train, y_train)
