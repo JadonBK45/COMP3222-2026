@@ -131,6 +131,28 @@ def test_log_loss_selection_scores_strictly_decrease():
     )
 
 
+def test_balanced_accuracy_metric_works_and_is_monotone():
+    X, y = load_iris(return_X_y=True)
+    selector = GreedyEnsembleSelector(
+        make_estimators(),
+        cv=5,
+        max_ensemble_size=2,
+        metric="balanced_accuracy",
+        random_state=42,
+    )
+
+    selector.fit(X, y)
+
+    assert 1 <= len(selector.selected_indices_) <= 2
+    assert all(
+        later >= earlier
+        for earlier, later in zip(
+            selector.selection_scores_,
+            selector.selection_scores_[1:],
+        )
+    )
+
+
 def test_invalid_metric_and_ensemble_size_raise():
     X, y = load_iris(return_X_y=True)
 

@@ -30,6 +30,12 @@ def generate_oof_probas(estimators, X, y, cv=5, random_state=None):
     scores : np.ndarray
         One-dimensional score array of length ``n_estimators`` containing the
         accuracy of each estimator on its out-of-fold predictions.
+
+    Notes
+    -----
+    StratifiedKFold is used here instead of a plain K-fold split because the
+    coursework datasets are class imbalanced. Preserving class proportions in
+    every fold gives a fairer estimate of each estimator's predictive quality.
     """
 
     # Input validation

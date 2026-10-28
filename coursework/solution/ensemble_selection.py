@@ -3,12 +3,21 @@
 from sklearn.base import ClassifierMixin, BaseEstimator, clone
 from .pool import generate_oof_probas
 import numpy as np
-from sklearn.metrics import log_loss
+from sklearn.metrics import balanced_accuracy_score, log_loss
 from sklearn.exceptions import NotFittedError
 
 
 class GreedyEnsembleSelector(ClassifierMixin, BaseEstimator):
     """Select a subset of classifiers greedily using accuracy or log loss.
+
+    This class supports the required metrics (``"accuracy"`` and ``"log loss"``)
+    and one additional option, ``"balanced_accuracy"``. Balanced accuracy is
+    useful for class-imbalanced UCR datasets because it rewards performance on
+    both minority and majority classes rather than letting majority-class
+    dominance hide a weak minority-class prediction. In other words, it treats
+    each class equally when measuring performance, which is important when some
+    datasets have a large imbalance between classes. The implementation still
+    defaults to the coursework metric choices for compatibility and clarity.
 
     Parameters
     ----------
@@ -18,7 +27,7 @@ class GreedyEnsembleSelector(ClassifierMixin, BaseEstimator):
         Number of stratified folds used to estimate out-of-fold probabilities.
     max_ensemble_size : int or None, default=None
         Maximum number of classifiers to include in the selected ensemble.
-    metric : {"accuracy", "log loss"}, default="accuracy"
+    metric : {"accuracy", "log loss", "balanced_accuracy"}, default="accuracy"
         Metric used to decide whether to add an estimator to the ensemble.
     random_state : int or None, default=None
         Seed used for reproducible cross-validation splits.
@@ -34,13 +43,23 @@ class GreedyEnsembleSelector(ClassifierMixin, BaseEstimator):
     def fit(self, X, y):
         """Fit the greedy selector and return the fitted estimator.
 
-        The selector first computes out-of-fold class probabilities for every
+        The selector first computes out of fold class probabilities for every
         candidate estimator, then greedily adds the candidate that improves the
         chosen objective the most until no further improvement is available.
+
+        Balanced accuracy is used as an optional extra metric because it averages
+        recall across classes, so class imbalance is handled more fairly than a
+        raw accuracy score. This makes it a useful alternative when a model may
+        score highly by predicting the majority class most of the time.
         """
+        metric = self.metric
+        if metric in ("balanced accuracy", "balanced_accuracy"):
+            metric = "balanced_accuracy"
+
         # Metric validation
-        if self.metric not in ("accuracy", "log loss"):
-            raise ValueError(f"Unsupported metric: {self.metric}")
+        if metric not in ("accuracy", "log loss", "balanced_accuracy"):
+            raise ValueError(f"Unsupported metric: {metric}")
+        self.metric = metric
         # max_ensemle size validation
         if (self.max_ensemble_size is not None and (
                 isinstance(self.max_ensemble_size, (bool, np.bool_))
@@ -57,9 +76,16 @@ class GreedyEnsembleSelector(ClassifierMixin, BaseEstimator):
         # Generate out-of-fold probabilities for each estimator in the pool
         oof_probas, accuracy_scores = generate_oof_probas(pool_estimators, X, y, cv=self.cv, random_state=self.random_state)
 
-        if self.metric == "accuracy":
+        if metric == "accuracy":
             first_index = int(np.argmax(accuracy_scores))
             current_score = float(accuracy_scores[first_index])
+        elif metric == "balanced_accuracy":
+            individual_balanced_accuracy = np.array([
+                balanced_accuracy_score(y, classes[np.argmax(probabilities, axis=1)])
+                for probabilities in oof_probas
+            ])
+            first_index = int(np.argmax(individual_balanced_accuracy))
+            current_score = float(individual_balanced_accuracy[first_index])
         else:
             individual_log_losses = np.array([log_loss(y, probabilities, labels=classes) for probabilities in oof_probas])
             first_index = int(np.argmin(individual_log_losses))
@@ -72,7 +98,7 @@ class GreedyEnsembleSelector(ClassifierMixin, BaseEstimator):
         # Continue adding estimators while selection is sitll posible
         while remaining_indices and (self.max_ensemble_size is None or len(selected_indices) < self.max_ensemble_size):
             best_candidate_index = None
-            if self.metric == "accuracy":
+            if metric in ("accuracy", "balanced_accuracy"):
                 best_candidate_score = -np.inf
             else:
                 best_candidate_score = np.inf
@@ -80,9 +106,13 @@ class GreedyEnsembleSelector(ClassifierMixin, BaseEstimator):
             for candidate_index in remaining_indices:
                 candidate_indices = selected_indices + [candidate_index]
                 averaged_probas = np.mean(oof_probas[candidate_indices], axis=0)
-                if self.metric == "accuracy":
+                if metric == "accuracy":
                     predictions = classes[np.argmax(averaged_probas, axis=1)]
                     candidate_score = float(np.mean(predictions == y))
+                    is_better = candidate_score > best_candidate_score
+                elif metric == "balanced_accuracy":
+                    predictions = classes[np.argmax(averaged_probas, axis=1)]
+                    candidate_score = float(balanced_accuracy_score(y, predictions))
                     is_better = candidate_score > best_candidate_score
                 else:
                     candidate_score = float(log_loss(y, averaged_probas, labels=classes))
@@ -94,7 +124,7 @@ class GreedyEnsembleSelector(ClassifierMixin, BaseEstimator):
 
             improves = (
                 best_candidate_score > current_score
-                if self.metric == "accuracy"
+                if metric in ("accuracy", "balanced_accuracy")
                 else best_candidate_score < current_score
             )
             if not improves:
