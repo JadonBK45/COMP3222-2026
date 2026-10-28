@@ -54,6 +54,41 @@ def test_fit_stores_selected_estimators_and_predictions():
     assert np.all(np.isin(predictions, selector.classes_))
 
 
+def test_max_ensemble_size_cap_is_respected():
+    X, y = load_iris(return_X_y=True)
+    selector = GreedyEnsembleSelector(
+        make_estimators(),
+        cv=5,
+        max_ensemble_size=1,
+        metric="accuracy",
+        random_state=42,
+    )
+
+    selector.fit(X, y)
+
+    assert len(selector.selected_indices_) == 1
+    assert len(selector.selected_names_) == 1
+    assert len(selector.estimators_) == 1
+
+
+def test_fit_is_reentrant():
+    X, y = load_iris(return_X_y=True)
+    selector = GreedyEnsembleSelector(
+        make_estimators(),
+        cv=5,
+        max_ensemble_size=2,
+        metric="accuracy",
+        random_state=42,
+    )
+
+    first_fit = selector.fit(X, y)
+    second_fit = selector.fit(X, y)
+
+    assert first_fit is second_fit
+    assert np.array_equal(selector.classes_, np.unique(y))
+    assert len(selector.selected_indices_) <= 2
+
+
 def test_accuracy_selection_scores_do_not_decrease():
     X, y = load_iris(return_X_y=True)
     selector = GreedyEnsembleSelector(

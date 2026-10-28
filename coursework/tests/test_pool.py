@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.datasets import load_iris
 from sklearn.linear_model import LogisticRegression
@@ -99,3 +100,62 @@ def test_random_state_is_reproducible():
 
     assert np.array_equal(first[0], second[0])
     assert np.array_equal(first[1], second[1])
+
+
+def test_invalid_estimators_raise():
+    X, y = load_iris(return_X_y=True)
+
+    with pytest.raises(ValueError):
+        generate_oof_probas([], X, y)
+
+    with pytest.raises(ValueError):
+        generate_oof_probas([("duplicate", LogisticRegression(max_iter=1000)),
+                             ("duplicate", LogisticRegression(max_iter=1000))],
+                            X, y)
+
+    with pytest.raises(ValueError):
+        generate_oof_probas([("no_proba", object())], X, y)
+
+
+def test_invalid_data_shapes_raise():
+    X, y = load_iris(return_X_y=True)
+
+    with pytest.raises(TypeError):
+        generate_oof_probas([("logistic", LogisticRegression(max_iter=1000))],
+                            X.tolist(), y)
+
+    with pytest.raises(ValueError):
+        generate_oof_probas([("logistic", LogisticRegression(max_iter=1000))],
+                            X.reshape(-1), y)
+
+    with pytest.raises(ValueError):
+        generate_oof_probas([("logistic", LogisticRegression(max_iter=1000))],
+                            X, y[:-1])
+
+    with pytest.raises(ValueError):
+        generate_oof_probas([("logistic", LogisticRegression(max_iter=1000))],
+                            np.empty((0, 4)), np.empty(0, dtype=int))
+
+    with pytest.raises(ValueError):
+        generate_oof_probas([("logistic", LogisticRegression(max_iter=1000))],
+                            X, np.array([0] * len(y)))
+
+
+def test_invalid_cv_and_random_state_raise():
+    X, y = load_iris(return_X_y=True)
+    estimators = [("logistic", LogisticRegression(max_iter=1000))]
+
+    with pytest.raises(ValueError):
+        generate_oof_probas(estimators, X, y, cv=1)
+
+    with pytest.raises(ValueError):
+        generate_oof_probas(estimators, X, y, cv=len(y) + 1)
+
+    with pytest.raises(TypeError):
+        generate_oof_probas(estimators, X, y, cv=True)
+
+    with pytest.raises(TypeError):
+        generate_oof_probas(estimators, X, y, random_state=True)
+
+    with pytest.raises(ValueError):
+        generate_oof_probas(estimators, X, np.array([0] * len(y)))

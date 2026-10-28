@@ -1,10 +1,29 @@
+"""Greedy ensemble selection based on out-of-fold validation scores."""
+
 from sklearn.base import ClassifierMixin, BaseEstimator, clone
 from .pool import generate_oof_probas
 import numpy as np
 from sklearn.metrics import log_loss
 from sklearn.exceptions import NotFittedError
 
+
 class GreedyEnsembleSelector(ClassifierMixin, BaseEstimator):
+    """Select a subset of classifiers greedily using accuracy or log loss.
+
+    Parameters
+    ----------
+    estimators : list[tuple[str, estimator]]
+        Pool of candidate classifiers to consider.
+    cv : int, default=5
+        Number of stratified folds used to estimate out-of-fold probabilities.
+    max_ensemble_size : int or None, default=None
+        Maximum number of classifiers to include in the selected ensemble.
+    metric : {"accuracy", "log loss"}, default="accuracy"
+        Metric used to decide whether to add an estimator to the ensemble.
+    random_state : int or None, default=None
+        Seed used for reproducible cross-validation splits.
+    """
+
     def __init__(self, estimators, cv=5, max_ensemble_size=None, metric="accuracy", random_state=None):
         self.estimators = estimators
         self.cv = cv
@@ -13,6 +32,12 @@ class GreedyEnsembleSelector(ClassifierMixin, BaseEstimator):
         self.random_state = random_state
 
     def fit(self, X, y):
+        """Fit the greedy selector and return the fitted estimator.
+
+        The selector first computes out-of-fold class probabilities for every
+        candidate estimator, then greedily adds the candidate that improves the
+        chosen objective the most until no further improvement is available.
+        """
         # Metric validation
         if self.metric not in ("accuracy", "log loss"):
             raise ValueError(f"Unsupported metric: {self.metric}")
@@ -23,10 +48,8 @@ class GreedyEnsembleSelector(ClassifierMixin, BaseEstimator):
                 or self.max_ensemble_size <= 0
             )
         ):
-            raise ValueError(
-                "max_ensemble_size must be None or a positive integer."
-            )
-        # Maintain reference to original estimator pool, in case fit is called multiple times
+            raise ValueError("max_ensemble_size must be None or a positive integer.")
+        # Maintain referecne to original estimator pool, in case fit is called multiple times
         pool_estimators = self.estimators
 
         classes = np.unique(y)
@@ -46,7 +69,7 @@ class GreedyEnsembleSelector(ClassifierMixin, BaseEstimator):
         selection_scores = [current_score]
         remaining_indices = [index for index in range(len(pool_estimators)) if index != first_index]
 
-        # Continue adding estimators while selection is sitll possible
+        # Continue adding estimators while selection is sitll posible
         while remaining_indices and (self.max_ensemble_size is None or len(selected_indices) < self.max_ensemble_size):
             best_candidate_index = None
             if self.metric == "accuracy":
@@ -98,6 +121,7 @@ class GreedyEnsembleSelector(ClassifierMixin, BaseEstimator):
         return self
 
     def predict_proba(self, X):
+        """Return the average class probabilities for the selected ensemble."""
         # Check if the model has been fitted
         if not hasattr(self, "selected_indices_"):
             raise NotFittedError("This GreedyEnsembleSelector instance is not fitted yet.")
@@ -113,35 +137,6 @@ class GreedyEnsembleSelector(ClassifierMixin, BaseEstimator):
         return np.mean(probabilities, axis=0)
 
     def predict(self, X):
+        """Return the predicted class labels for the selected ensemble."""
         probabilities = self.predict_proba(X)
         return self.classes_[np.argmax(probabilities, axis=1)]
-
-# if __name__ == "__main__":
-#     ## Test greedy ensemble on the specified dataset.
-#     from part3_setup import load_dataset
-#     from part3_setup import make_pool
-#     ensemble = GreedyEnsembleSelector(make_pool(), cv=5, metric="log loss", random_state=0)
-#     X_train, y_train, X_test, y_test = load_dataset("DistalPhalanxOutlineAgeGroup")
-#     ensemble.fit(X_train, y_train)
-#     y_pred = ensemble.predict(X_test)
-#     from sklearn.metrics import accuracy_score
-#     print(f"Greedy ensemble log loss on DistalPhalanxOutlineAgeGroup: {accuracy_score(y_test, y_pred)}")
-#     print(f"Selected estimators: {ensemble.selected_names_}")
-#     print(f"Selection scores: {ensemble.selection_scores_}")
-
-#     # Determine the best single classifier on the ToeSegmentation1 dataset.
-#     from part3_setup import load_dataset
-#     from part3_setup import make_pool
-#     from .pool import generate_oof_probas
-#     from sklearn.base import clone
-#     from sklearn.metrics import accuracy_score
-#     X_train, y_train, X_test, y_test = load_dataset("ToeSegmentation1")
-#     RANDOM_STATE = 0
-#     CV = 5
-#     pool = make_pool()
-#     _, scores = generate_oof_probas(pool, X_train, y_train, cv=CV, random_state=RANDOM_STATE)
-#     best_index = int(np.argmax(scores))
-#     fitted = clone(pool[best_index][1]).fit(X_train, y_train).predict(X_test)
-#     print(f"Best single classifier accuracy on ToeSegmentation1: {accuracy_score(y_test, fitted)}")
-#     print(f"Best single classifier: {pool[best_index][0]} with accuracy {scores[best_index]}")
-#     print(f"Second best classifier: {pool[np.argsort(scores)[-2]][0]} with accuracy {scores[np.argsort(scores)[-2]]}")

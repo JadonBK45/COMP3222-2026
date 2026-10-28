@@ -1,7 +1,36 @@
+"""Helpers for generating out-of-fold probability estimates for a model pool."""
+
 from sklearn.model_selection import StratifiedKFold
 from sklearn.base import clone
 import numpy as np
-def generate_oof_probas(estimators,X,y,cv=5,random_state=None):
+
+
+def generate_oof_probas(estimators, X, y, cv=5, random_state=None):
+    """Return out-of-fold class probabilities and per-estimator validation scores.
+
+    Parameters
+    ----------
+    estimators : list[tuple[str, estimator]]
+        A list of ``(name, estimator)`` pairs. Each estimator must implement
+        ``predict_proba`` and be compatible with scikit-learn's ``clone``.
+    X : np.ndarray
+        Two-dimensional feature matrix with shape ``(n_samples, n_features)``.
+    y : np.ndarray
+        One-dimensional target array of length ``n_samples``.
+    cv : int, default=5
+        Number of stratified folds to use for cross-validation.
+    random_state : int or None, default=None
+        Random seed used to make the fold splits reproducible.
+
+    Returns
+    -------
+    probabilities : np.ndarray
+        Array of shape ``(n_estimators, n_samples, n_classes)`` containing the
+        out-of-fold probability estimates for each estimator.
+    scores : np.ndarray
+        One-dimensional score array of length ``n_estimators`` containing the
+        accuracy of each estimator on its out-of-fold predictions.
+    """
 
     # Input validation
     if not isinstance(estimators, list):
