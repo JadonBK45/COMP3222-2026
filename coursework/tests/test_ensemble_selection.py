@@ -15,6 +15,18 @@ def make_estimators():
     ]
 
 
+def make_identical_estimators():
+    return [
+        ("first", LogisticRegression(max_iter=1000, random_state=42)),
+        ("second", LogisticRegression(max_iter=1000, random_state=42)),
+    ]
+
+
+class EqualProbabilityClassifier(LogisticRegression):
+    def predict_proba(self, X):
+        return np.full((len(X), len(self.classes_)), 0.5)
+
+
 def test_predict_requires_fit():
     X, _ = load_iris(return_X_y=True)
     selector = GreedyEnsembleSelector(make_estimators())
@@ -52,6 +64,64 @@ def test_fit_stores_selected_estimators_and_predictions():
     assert np.all(probabilities >= 0)
     assert np.allclose(probabilities.sum(axis=1), 1.0)
     assert np.all(np.isin(predictions, selector.classes_))
+
+
+def test_predict_ties_choose_first_class():
+    X, y = load_iris(return_X_y=True)
+    selector = GreedyEnsembleSelector(
+        [("equal", EqualProbabilityClassifier(max_iter=1000))],
+        cv=5,
+        max_ensemble_size=1,
+        random_state=42,
+    ).fit(X, y)
+
+    predictions = selector.predict(X[:5])
+
+    assert np.all(predictions == selector.classes_[0])
+
+
+def test_selection_stops_when_no_candidate_strictly_improves():
+    X, y = load_iris(return_X_y=True)
+    selector = GreedyEnsembleSelector(
+        make_identical_estimators(),
+        cv=5,
+        metric="accuracy",
+        random_state=42,
+    ).fit(X, y)
+
+    assert selector.selected_indices_ == [0]
+    assert selector.selected_names_ == ["first"]
+    assert len(selector.selection_scores_) == 1
+
+
+def test_ties_select_the_first_estimator():
+    X, y = load_iris(return_X_y=True)
+    selector = GreedyEnsembleSelector(
+        make_identical_estimators(),
+        cv=5,
+        max_ensemble_size=1,
+        metric="accuracy",
+        random_state=42,
+    ).fit(X, y)
+
+    assert selector.selected_indices_ == [0]
+    assert selector.selected_names_ == ["first"]
+
+
+def test_selected_estimators_are_fresh_fitted_clones():
+    X, y = load_iris(return_X_y=True)
+    estimators = make_estimators()
+    selector = GreedyEnsembleSelector(
+        estimators,
+        cv=5,
+        max_ensemble_size=1,
+        metric="accuracy",
+        random_state=42,
+    ).fit(X, y)
+
+    assert all(not hasattr(estimator, "classes_") for _, estimator in estimators)
+    assert selector.estimators_[0] is not estimators[selector.selected_indices_[0]][1]
+    assert hasattr(selector.estimators_[0], "classes_")
 
 
 def test_max_ensemble_size_cap_is_respected():
@@ -153,17 +223,22 @@ def test_balanced_accuracy_metric_works_and_is_monotone():
     )
 
 
-def test_invalid_metric_and_ensemble_size_raise():
+@pytest.mark.parametrize("invalid_size", [0, -1, True, 1.5, "2"])
+def test_invalid_ensemble_size_raises(invalid_size):
+    X, y = load_iris(return_X_y=True)
+
+    with pytest.raises((TypeError, ValueError)):
+        GreedyEnsembleSelector(
+            make_estimators(),
+            max_ensemble_size=invalid_size,
+        ).fit(X, y)
+
+
+def test_invalid_metric_raises():
     X, y = load_iris(return_X_y=True)
 
     with pytest.raises(ValueError):
         GreedyEnsembleSelector(
             make_estimators(),
             metric="f1",
-        ).fit(X, y)
-
-    with pytest.raises(ValueError):
-        GreedyEnsembleSelector(
-            make_estimators(),
-            max_ensemble_size=0,
         ).fit(X, y)

@@ -22,6 +22,50 @@ class TrainingMembershipClassifier(BaseEstimator, ClassifierMixin):
         ])
 
 
+class ReversedClassOrderClassifier(BaseEstimator, ClassifierMixin):
+    """Return probabilities whose columns are deliberately reversed."""
+
+    def fit(self, X, y):
+        self.classes_ = np.array([1, 0])
+        return self
+
+    def predict_proba(self, X):
+        return np.tile([[0.25, 0.75]], (len(X), 1))
+
+
+def test_class_columns_follow_np_unique_order():
+    X = np.arange(12).reshape(-1, 1)
+    y = np.array([1, 0] * 6)
+
+    probabilities, scores = generate_oof_probas(
+        [("reversed", ReversedClassOrderClassifier())],
+        X,
+        y,
+        cv=3,
+        random_state=42,
+    )
+
+    assert np.array_equal(np.unique(y), np.array([0, 1]))
+    assert np.allclose(probabilities[0], [[0.75, 0.25]] * len(y))
+    assert scores[0] == np.mean(y == 0)
+
+
+def test_estimators_are_cloned_without_being_fitted():
+    X, y = load_iris(return_X_y=True)
+    estimator = LogisticRegression(max_iter=1000, random_state=42)
+
+    generate_oof_probas(
+        [("logistic", estimator)],
+        X,
+        y,
+        cv=5,
+        random_state=42,
+    )
+
+    assert not hasattr(estimator, "classes_")
+    assert estimator.random_state == 42
+
+
 def test_output_shapes():
     X, y = load_iris(return_X_y=True)
     estimators = [

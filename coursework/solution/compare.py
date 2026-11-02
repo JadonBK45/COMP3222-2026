@@ -11,10 +11,38 @@ from .ensemble_selection import GreedyEnsembleSelector
 from .pool import generate_oof_probas
 
 
+def _validate_evaluation_data(X_train, y_train, X_test, y_test):
+    """Validate the common train/test contract used by comparison helpers."""
+    arrays = (
+        ("X_train", X_train),
+        ("y_train", y_train),
+        ("X_test", X_test),
+        ("y_test", y_test),
+    )
+    for name, array in arrays:
+        if not isinstance(array, np.ndarray):
+            raise TypeError(f"{name} must be a NumPy array.")
+
+    if X_train.ndim != 2 or X_test.ndim != 2:
+        raise ValueError("X_train and X_test must be two-dimensional arrays.")
+    if y_train.ndim != 1 or y_test.ndim != 1:
+        raise ValueError("y_train and y_test must be one-dimensional arrays.")
+    if len(X_train) != len(y_train):
+        raise ValueError("X_train and y_train must contain the same number of cases.")
+    if len(X_test) != len(y_test):
+        raise ValueError("X_test and y_test must contain the same number of cases.")
+    if X_train.shape[1] != X_test.shape[1]:
+        raise ValueError("X_train and X_test must have the same number of features.")
+    if len(X_train) == 0 or len(X_test) == 0:
+        raise ValueError("Training and test data must not be empty.")
+
+
 def best_single_classifier(X_train, y_train, X_test, y_test):
     """Return the test accuracy of the best single estimator in the pool.
 
-    All ensemble selection methods use the same parameters to calculate accuracy.
+    The best estimator is chosen using out-of-fold training predictions, then
+    fitted on all training data before it predicts the test data.
+
     Parameters
     ----------
     X_train : np.ndarray
@@ -30,7 +58,16 @@ def best_single_classifier(X_train, y_train, X_test, y_test):
     -------
     float
         Test accuracy of the best single estimator in the pool.
+
+    Raises
+    ------
+    TypeError
+        If an input is not a NumPy array.
+    ValueError
+        If arrays have invalid dimensions, incompatible lengths, incompatible
+        feature counts, or contain no cases.
     """
+    _validate_evaluation_data(X_train, y_train, X_test, y_test)
     pool = make_pool()
     _, scores = generate_oof_probas(pool, X_train, y_train, cv=CV, random_state=RANDOM_STATE)
     best_index = int(np.argmax(scores))
@@ -39,11 +76,22 @@ def best_single_classifier(X_train, y_train, X_test, y_test):
 
 
 def full_pool_ensemble(X_train, y_train, X_test, y_test):
-    """Return the test accuracy of the equally weighted full classifier pool."""
+    """Return the test accuracy of an equally weighted full classifier pool.
+
+    Class probabilities are aligned by class label before averaging, so
+    estimators may expose classes in different orders.
+
+    Raises
+    ------
+    TypeError, ValueError
+        If the input arrays do not satisfy the common evaluation-data
+        contract.
+    """
+    _validate_evaluation_data(X_train, y_train, X_test, y_test)
     pool = make_pool()
     classes = np.unique(y_train)
     probas = np.zeros((len(pool), X_test.shape[0], len(classes)))
-    for i, (name, estimator) in enumerate(pool):
+    for i, (_, estimator) in enumerate(pool):
         fitted = clone(estimator).fit(X_train, y_train)
         fitted_probas = fitted.predict_proba(X_test)
         for column, class_label in enumerate(fitted.classes_):
@@ -54,33 +102,59 @@ def full_pool_ensemble(X_train, y_train, X_test, y_test):
 
 
 def stacking_ensemble(X_train, y_train, X_test, y_test):
-    """Return the test accuracy of a stacking classifier trained on the pool."""
+    """Return the test accuracy of a stacking classifier trained on the pool.
+
+    Raises
+    ------
+    TypeError, ValueError
+        If the input arrays do not satisfy the common evaluation-data
+        contract.
+    """
+    _validate_evaluation_data(X_train, y_train, X_test, y_test)
     stacking = make_stacking().fit(X_train, y_train)
     return accuracy_score(y_test, stacking.predict(X_test))
 
 
 def greedy_accuracy_ensemble(X_train, y_train, X_test, y_test, max_ensemble_size=None):
     """Return accuracy, selected count, and final score for greedy accuracy selection.
-    
+
+    ``max_ensemble_size=None`` permits the selector to continue until no
+    candidate improves the out-of-fold accuracy.
+
     Returns
     -------
     tuple
-        A tuple containing the test accuracy, the number of selected estimators, and the final selection score.
+        ``(test_accuracy, selected_count, selection_score)``.
 
+    Raises
+    ------
+    TypeError, ValueError
+        If the input arrays do not satisfy the common evaluation-data
+        contract, or if ``max_ensemble_size`` is invalid.
     """
+    _validate_evaluation_data(X_train, y_train, X_test, y_test)
     greedy_accuracy = GreedyEnsembleSelector(make_pool(), cv=CV, max_ensemble_size=max_ensemble_size, metric="accuracy", random_state=RANDOM_STATE).fit(X_train, y_train)
     return (accuracy_score(y_test, greedy_accuracy.predict(X_test)), len(greedy_accuracy.selected_indices_), greedy_accuracy.selection_scores_[-1])
 
 
 def greedy_log_loss_ensemble(X_train, y_train, X_test, y_test, max_ensemble_size=None):
     """Return accuracy and selected count for greedy log-loss-based selection.
-    
+
+    The selector stops when adding another estimator does not reduce the
+    out-of-fold log loss.
+
     Returns
     -------
     tuple
-        A tuple containing the test accuracy and the number of selected estimators.
+        ``(test_accuracy, selected_count)``.
 
+    Raises
+    ------
+    TypeError, ValueError
+        If the input arrays do not satisfy the common evaluation-data
+        contract, or if ``max_ensemble_size`` is invalid.
     """
+    _validate_evaluation_data(X_train, y_train, X_test, y_test)
     greedy_log_loss = GreedyEnsembleSelector(make_pool(), cv=CV, max_ensemble_size=max_ensemble_size, metric="log loss", random_state=RANDOM_STATE).fit(X_train, y_train)
     return accuracy_score(y_test, greedy_log_loss.predict(X_test)), len(greedy_log_loss.selected_indices_)
 

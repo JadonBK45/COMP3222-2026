@@ -48,6 +48,18 @@ class GreedyEnsembleSelector(ClassifierMixin, BaseEstimator):
         recall across classes, so class imbalance is handled more fairly than a
         raw accuracy score. This makes it a useful alternative when a model may
         score highly by predicting the majority class most of the time.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            Two-dimensional feature matrix.
+        y : np.ndarray
+            One-dimensional array of class labels.
+
+        Returns
+        -------
+        GreedyEnsembleSelector
+            This fitted selector.
         """
         metric = self.metric
         if metric in ("balanced accuracy", "balanced_accuracy"):
@@ -148,7 +160,24 @@ class GreedyEnsembleSelector(ClassifierMixin, BaseEstimator):
         return self
 
     def predict_proba(self, X):
-        """Return the average class probabilities for the selected ensemble."""
+        """Return the average class probabilities for the selected ensemble.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            Two-dimensional feature matrix containing the cases to classify.
+
+        Returns
+        -------
+        np.ndarray
+            Array of shape ``(n_cases, n_classes)``. Columns follow
+            ``classes_`` order.
+
+        Raises
+        ------
+        NotFittedError
+            If ``fit`` has not been called.
+        """
         # Check if the model has been fitted
         if not hasattr(self, "selected_indices_"):
             raise NotFittedError("This GreedyEnsembleSelector instance is not fitted yet.")
@@ -164,6 +193,24 @@ class GreedyEnsembleSelector(ClassifierMixin, BaseEstimator):
         return np.mean(probabilities, axis=0)
 
     def predict(self, X):
-        """Return the predicted class labels for the selected ensemble."""
+        """Return the predicted class labels for the selected ensemble.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            Two-dimensional feature matrix containing the cases to classify.
+
+        Returns
+        -------
+        np.ndarray
+            One-dimensional array of predicted class labels. Equal maximum
+            probabilities are resolved in favour of the first class in
+            ``classes_``.
+
+        Raises
+        ------
+        NotFittedError
+            If ``fit`` has not been called.
+        """
         probabilities = self.predict_proba(X)
         return self.classes_[np.argmax(probabilities, axis=1)]
