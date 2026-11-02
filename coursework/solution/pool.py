@@ -1,5 +1,3 @@
-"""Helpers for generating out-of-fold probability estimates for a model pool."""
-
 from sklearn.model_selection import StratifiedKFold
 from sklearn.base import clone
 import numpy as np

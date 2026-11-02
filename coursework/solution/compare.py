@@ -12,7 +12,25 @@ from .pool import generate_oof_probas
 
 
 def best_single_classifier(X_train, y_train, X_test, y_test):
-    """Return the test accuracy of the best single estimator in the pool."""
+    """Return the test accuracy of the best single estimator in the pool.
+
+    All ensemble selection methods use the same parameters to calculate accuracy.
+    Parameters
+    ----------
+    X_train : np.ndarray
+        Two-dimensional feature matrix with shape ``(n_samples, n_features)``.
+    y_train : np.ndarray
+        One-dimensional target array of length ``n_samples``.
+    X_test : np.ndarray
+        Two-dimensional feature matrix with shape ``(n_samples, n_features)``.
+    y_test : np.ndarray
+        One-dimensional target array of length ``n_samples``.
+
+    Returns
+    -------
+    float
+        Test accuracy of the best single estimator in the pool.
+    """
     pool = make_pool()
     _, scores = generate_oof_probas(pool, X_train, y_train, cv=CV, random_state=RANDOM_STATE)
     best_index = int(np.argmax(scores))
@@ -42,30 +60,28 @@ def stacking_ensemble(X_train, y_train, X_test, y_test):
 
 
 def greedy_accuracy_ensemble(X_train, y_train, X_test, y_test, max_ensemble_size=None):
-    """Return accuracy, selected count, and final score for greedy accuracy selection."""
-    greedy_accuracy = GreedyEnsembleSelector(
-        make_pool(),
-        cv=CV,
-        max_ensemble_size=max_ensemble_size,
-        metric="accuracy",
-        random_state=RANDOM_STATE,
-    ).fit(X_train, y_train)
-    return (
-        accuracy_score(y_test, greedy_accuracy.predict(X_test)),
-        len(greedy_accuracy.selected_indices_),
-        greedy_accuracy.selection_scores_[-1],
-    )
+    """Return accuracy, selected count, and final score for greedy accuracy selection.
+    
+    Returns
+    -------
+    tuple
+        A tuple containing the test accuracy, the number of selected estimators, and the final selection score.
+
+    """
+    greedy_accuracy = GreedyEnsembleSelector(make_pool(), cv=CV, max_ensemble_size=max_ensemble_size, metric="accuracy", random_state=RANDOM_STATE).fit(X_train, y_train)
+    return (accuracy_score(y_test, greedy_accuracy.predict(X_test)), len(greedy_accuracy.selected_indices_), greedy_accuracy.selection_scores_[-1])
 
 
 def greedy_log_loss_ensemble(X_train, y_train, X_test, y_test, max_ensemble_size=None):
-    """Return accuracy and selected count for greedy log-loss-based selection."""
-    greedy_log_loss = GreedyEnsembleSelector(
-        make_pool(),
-        cv=CV,
-        max_ensemble_size=max_ensemble_size,
-        metric="log loss",
-        random_state=RANDOM_STATE,
-    ).fit(X_train, y_train)
+    """Return accuracy and selected count for greedy log-loss-based selection.
+    
+    Returns
+    -------
+    tuple
+        A tuple containing the test accuracy and the number of selected estimators.
+
+    """
+    greedy_log_loss = GreedyEnsembleSelector(make_pool(), cv=CV, max_ensemble_size=max_ensemble_size, metric="log loss", random_state=RANDOM_STATE).fit(X_train, y_train)
     return accuracy_score(y_test, greedy_log_loss.predict(X_test)), len(greedy_log_loss.selected_indices_)
 
 

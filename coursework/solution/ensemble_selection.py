@@ -1,5 +1,3 @@
-"""Greedy ensemble selection based on out-of-fold validation scores."""
-
 from sklearn.base import ClassifierMixin, BaseEstimator, clone
 from .pool import generate_oof_probas
 import numpy as np
@@ -16,8 +14,7 @@ class GreedyEnsembleSelector(ClassifierMixin, BaseEstimator):
     both minority and majority classes rather than letting majority-class
     dominance hide a weak minority-class prediction. In other words, it treats
     each class equally when measuring performance, which is important when some
-    datasets have a large imbalance between classes. The implementation still
-    defaults to the coursework metric choices for compatibility and clarity.
+    datasets have a large imbalance between classes.
 
     Parameters
     ----------
